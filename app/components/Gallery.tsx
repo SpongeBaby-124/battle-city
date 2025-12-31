@@ -1,6 +1,6 @@
 import { Map } from 'immutable'
 import React from 'react'
-import { Redirect, Route } from 'react-router'
+import { Navigate, useParams, useNavigate } from 'react-router-dom'
 import { combineReducers } from 'redux'
 import { all } from 'redux-saga/effects'
 import saga from '../hocs/saga'
@@ -12,7 +12,6 @@ import fireDemoSaga from '../sagas/fireDemoSaga'
 import tickEmitter from '../sagas/tickEmitter'
 import { PlayerRecord, PowerUpRecord, TankRecord } from '../types'
 import { BLOCK_SIZE as B } from '../utils/constants'
-import history from '../utils/history'
 import { BattleFieldContent } from './BattleFieldScene'
 import { GameoverSceneContent } from './GameoverScene'
 import { GameTitleSceneContent } from './GameTitleScene'
@@ -146,8 +145,8 @@ namespace GalleryContent {
             </g>
           </Transform>
           <Transform x={16} y={40}>
-            {game.paused ? <PauseIndicator content="paused" noflash /> : null}
-            {game.paused ? <PauseIndicator content="paused" noflash y={6 * B} /> : null}
+            {game?.paused ? <PauseIndicator content="paused" noflash /> : null}
+            {game?.paused ? <PauseIndicator content="paused" noflash y={6 * B} /> : null}
           </Transform>
           <Transform x={0.5 * B} y={13.5 * B} k={0.5}>
             <Text fill="#999" content="Hint: Press ESC to pause" />
@@ -303,27 +302,32 @@ namespace GalleryContent {
 
 const tabs = ['tanks', 'texts', 'fire', 'misc', 'title-scene', 'statistics', 'gameover', 'info']
 
-class Gallery extends React.PureComponent<{ tab: string }> {
+interface GalleryProps {
+  tab: string
+  navigate: (path: string) => void
+}
+
+class GalleryInner extends React.PureComponent<GalleryProps> {
   onChoosePrevTab = () => {
-    const { tab } = this.props
+    const { tab, navigate } = this.props
     const index = tabs.indexOf(tab)
-    history.replace(`/gallery/${tabs[index - 1]}`)
+    navigate(`/gallery/${tabs[index - 1]}`)
   }
   onChooseNextTab = () => {
-    const { tab } = this.props
+    const { tab, navigate } = this.props
     const index = tabs.indexOf(tab)
-    history.replace(`/gallery/${tabs[index + 1]}`)
+    navigate(`/gallery/${tabs[index + 1]}`)
   }
 
   render() {
-    const { tab } = this.props
+    const { tab, navigate } = this.props
     const index = tabs.indexOf(tab)
     const NavText = ({ content, x }: { content: string; x: number }) => (
       <TextButton
         textFill={content === tab ? '#999' : '#444'}
         x={x}
         content={content}
-        onClick={() => history.replace(`/gallery/${content}`)}
+        onClick={() => navigate(`/gallery/${content}`)}
       />
     )
 
@@ -343,7 +347,7 @@ class Gallery extends React.PureComponent<{ tab: string }> {
             onClick={this.onChooseNextTab}
             disabled={index === tabs.length - 1}
           />
-          <TextButton x={5 * B} content="back" onClick={() => history.goBack()} />
+          <TextButton x={5 * B} content="back" onClick={() => navigate(-1 as any)} />
         </g>
         {tab === 'tanks' && <GalleryContent.Tanks />}
         {tab === 'texts' && <GalleryContent.Texts />}
@@ -369,15 +373,13 @@ class Gallery extends React.PureComponent<{ tab: string }> {
   }
 }
 
-export default () => (
-  <Route
-    path="/gallery/:tab"
-    children={({ match }) => {
-      if (match != null && tabs.includes(match.params.tab)) {
-        return <Gallery tab={match.params.tab} />
-      } else {
-        return <Redirect to={`/gallery/${tabs[0]}`} />
-      }
-    }}
-  />
-)
+export default function Gallery() {
+  const { tab } = useParams<{ tab: string }>()
+  const navigate = useNavigate()
+
+  if (!tab || !tabs.includes(tab)) {
+    return <Navigate to={`/gallery/${tabs[0]}`} replace />
+  }
+
+  return <GalleryInner tab={tab} navigate={navigate} />
+}

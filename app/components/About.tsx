@@ -1,6 +1,5 @@
 import classNames from 'classnames'
-import React from 'react'
-import { Route, Switch } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
 
 const AboutGallery = () => (
   <div>
@@ -79,38 +78,44 @@ const AboutTitle = () => (
   </div>
 )
 
-export default class About extends React.Component {
-  state = { hide: false }
+function AboutContent() {
+  const location = useLocation()
+  const pathname = location.pathname
 
-  onHide = () => {
-    this.setState({ hide: true })
+  if (pathname.startsWith('/list')) {
+    return <AboutList />
+  } else if (pathname.startsWith('/editor')) {
+    return <AboutEditor />
+  } else if (pathname.startsWith('/gallery')) {
+    return <AboutGallery />
+  } else if (pathname === '/gameover') {
+    return <AboutGame />
+  } else if (pathname.startsWith('/choose')) {
+    return <AboutChoose />
+  } else if (pathname.startsWith('/stage')) {
+    return <AboutGame />
+  } else {
+    return <AboutTitle />
   }
+}
 
-  render() {
-    const { hide } = this.state
-    return (
-      <div className={classNames('about', { hide })}>
-        <button className="close" onClick={this.onHide}>
-          隐藏
-        </button>
-        <p>
-          当前版本 <br />
-          {COMPILE_VERSION}
-        </p>
-        <p>
-          编译时间 <br />
-          {COMPILE_DATE}
-        </p>
-        <Switch>
-          <Route path="/list" render={AboutList} />
-          <Route path="/editor" render={AboutEditor} />
-          <Route path="/gallery" render={AboutGallery} />
-          <Route exact path="/gameover" render={AboutGame} />
-          <Route path="/choose" render={AboutChoose} />
-          <Route path="/stage" render={AboutGame} />
-          <Route render={AboutTitle} />
-        </Switch>
-      </div>
-    )
-  }
+export default function About() {
+  const [hide, setHide] = React.useState(false)
+
+  return (
+    <div className={classNames('about', { hide })}>
+      <button className="close" onClick={() => setHide(true)}>
+        隐藏
+      </button>
+      <p>
+        当前版本 <br />
+        {COMPILE_VERSION}
+      </p>
+      <p>
+        编译时间 <br />
+        {COMPILE_DATE}
+      </p>
+      <AboutContent />
+    </div>
+  )
 }

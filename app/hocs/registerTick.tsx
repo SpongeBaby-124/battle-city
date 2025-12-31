@@ -1,8 +1,13 @@
 import getSum from 'lodash/sum'
 import React from 'react'
 import { connect } from 'react-redux'
-import { wrapDisplayName } from 'recompose'
 import { State } from '../types'
+
+// 简单的 displayName 包装函数，替代 recompose 的 wrapDisplayName
+function wrapDisplayName(BaseComponent: React.ComponentType<any>, hocName: string): string {
+  const wrappedDisplayName = BaseComponent.displayName || BaseComponent.name || 'Component'
+  return `${hocName}(${wrappedDisplayName})`
+}
 
 // HOC. 用来向组件注入名为 'tickIndex' 的prop
 // tickIndex会随着时间变化

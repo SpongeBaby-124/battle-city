@@ -1,4 +1,4 @@
-import { replace } from 'react-router-redux'
+import { replace } from '../utils/router'
 import { all, put, race, select, take } from 'redux-saga/effects'
 import { delay } from 'redux-saga/effects'
 import { State } from '../reducers'

@@ -5,12 +5,14 @@
     "outDir": "./build/",
     "sourceMap": true,
     "noImplicitAny": true,
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "noStrictGenericChecks": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "skipLibCheck": true,
-    "target": "es2017",
-    "jsx": "react"
+    "target": "ES2020",
+    "jsx": "react-jsx",
+    "strict": false,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true
   },
   "include": ["./app/**/*", "custom-tyings.d.ts"]
 }

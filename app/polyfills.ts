@@ -1,4 +1,3 @@
-import 'core-js/fn/array/includes'
-import 'core-js/fn/object/entries'
-import 'core-js/fn/string/pad-end'
-import 'core-js/fn/string/pad-start'
+// Polyfills are no longer needed for modern browsers (ES2017+)
+// Array.prototype.includes, Object.entries, String.prototype.padStart/padEnd
+// are all natively supported in modern browsers

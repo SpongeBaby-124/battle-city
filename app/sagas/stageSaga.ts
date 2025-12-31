@@ -1,4 +1,4 @@
-import { replace } from 'react-router-redux'
+import { replace } from '../utils/router'
 import { cancelled, put, select, take } from 'redux-saga/effects'
 import { State } from '../reducers'
 import { TankRecord } from '../types'

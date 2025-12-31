@@ -1,8 +1,8 @@
 import { is, List, Repeat } from 'immutable'
 import React from 'react'
 import { connect } from 'react-redux'
-import { match, Redirect, Route } from 'react-router-dom'
-import { goBack, replace } from 'react-router-redux'
+import { Navigate, useParams, useNavigate, useLocation } from 'react-router-dom'
+import { goBack, replace } from '../utils/router'
 import { Dispatch } from 'redux'
 import { StageConfig, StageDifficulty, State, TankRecord } from '../types/index'
 import { defaultBotsConfig, MapItem, MapItemType, StageConfigConverter } from '../types/StageConfig'
@@ -109,7 +109,7 @@ class Editor extends React.Component<EditorProps> {
     while (node) {
       totalTop += node.scrollTop + node.clientTop
       totalLeft += node.scrollLeft + node.clientLeft
-      node = node.parentElement
+      node = node.parentElement!
     }
     const row = Math.floor((event.clientY + totalTop - this.svg.clientTop) / ZOOM_LEVEL / B)
     const col = Math.floor((event.clientX + totalLeft - this.svg.clientLeft) / ZOOM_LEVEL / B)
@@ -326,8 +326,8 @@ class Editor extends React.Component<EditorProps> {
 
   renderHexAdjustButtons() {
     const { itemType, brickHex, steelHex } = this.state
-    let brickHexAdjustButtons: JSX.Element[] = null
-    let steelHexAdjustButtons: JSX.Element[] = null
+    let brickHexAdjustButtons: JSX.Element[] = null!
+    let steelHexAdjustButtons: JSX.Element[] = null!
 
     if (itemType === 'B') {
       brickHexAdjustButtons = [0b0001, 0b0010, 0b0100, 0b1000].map(bin => (
@@ -512,7 +512,7 @@ class Editor extends React.Component<EditorProps> {
     return (
       <Screen
         background="#333"
-        refFn={node => (this.svg = node)}
+        refFn={node => (this.svg = node!)}
         onMouseDown={this.onMouseDown}
         onMouseUp={this.onMouseUp}
         onMouseMove={this.onMouseMove}
@@ -544,37 +544,23 @@ class Editor extends React.Component<EditorProps> {
   }
 }
 
-const EditorWrapper = ({
-  match,
-  dispatch,
-  initialCotnent,
-  stages,
-}: EditorProps & { match: match<{ view: string }> }) => (
-  <Route
-    path={`${match.url}/:view`}
-    children={({ match }) => {
-      // match 在这里可能为 null
-      const view = match && match.params.view
-      if (!['map', 'config'].includes(view)) {
-        return <Redirect to="/editor/config" />
-      }
-      return (
-        <PopupProvider>
-          {popupHandle => (
-            <Editor
-              view={view}
-              dispatch={dispatch}
-              initialCotnent={initialCotnent}
-              stages={stages}
-              popupHandle={popupHandle}
-            />
-          )}
-        </PopupProvider>
-      )
-    }}
-  />
-)
+const ConnectedEditor = connect((s: State) => ({ initialCotnent: s.editorContent, stages: s.stages }))(Editor)
 
-const mapStateToProps = (s: State) => ({ initialCotnent: s.editorContent, stages: s.stages })
+export default function EditorWrapper() {
+  const { view } = useParams<{ view: string }>()
 
-export default connect(mapStateToProps)(EditorWrapper)
+  if (!view || !['map', 'config'].includes(view)) {
+    return <Navigate to="/editor/config" replace />
+  }
+
+  return (
+    <PopupProvider>
+      {popupHandle => (
+        <ConnectedEditor
+          view={view}
+          popupHandle={popupHandle}
+        />
+      )}
+    </PopupProvider>
+  )
+}

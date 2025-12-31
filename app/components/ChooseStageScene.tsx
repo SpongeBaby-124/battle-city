@@ -1,8 +1,8 @@
 import { List } from 'immutable'
 import React from 'react'
 import { connect } from 'react-redux'
-import { match, Redirect } from 'react-router-dom'
-import { push, replace } from 'react-router-redux'
+import { Navigate, useParams, useLocation } from 'react-router-dom'
+import { push, replace } from '../utils/router'
 import { Dispatch } from 'redux'
 import { StageConfig, State } from '../types'
 import { BLOCK_SIZE as B, PLAYER_CONFIGS } from '../utils/constants'
@@ -11,12 +11,14 @@ import StagePreview from './StagePreview'
 import Text from './Text'
 import TextButton from './TextButton'
 
-class ChooseStageScene extends React.PureComponent<{
+interface ChooseStageSceneInnerProps {
   stages: List<StageConfig>
   dispatch: Dispatch
-  location: Location
-  match: match<{ stageName: string }>
-}> {
+  stageName: string
+  search: string
+}
+
+class ChooseStageSceneInner extends React.PureComponent<ChooseStageSceneInnerProps> {
   componentDidMount() {
     document.addEventListener('keydown', this.onKeyDown)
   }
@@ -37,23 +39,22 @@ class ChooseStageScene extends React.PureComponent<{
   }
 
   getCurrentStageIndex = () => {
-    const { stages, match } = this.props
-    const { stageName } = match.params
+    const { stages, stageName } = this.props
     const stageIndex = stages.findIndex(s => s.name === stageName)
     DEV.ASSERT && console.assert(stageIndex !== -1)
     return stageIndex
   }
 
   onChoose = (stageName: string) => {
-    const { dispatch, location } = this.props
-    dispatch(replace(`/choose/${stageName}${location.search}`))
+    const { dispatch, search } = this.props
+    dispatch(replace(`/choose/${stageName}${search}`))
   }
 
   onChoosePrevStage = () => {
     const { stages } = this.props
     const stageIndex = this.getCurrentStageIndex()
     if (stageIndex > 0) {
-      this.onChoose(stages.get(stageIndex - 1).name)
+      this.onChoose(stages.get(stageIndex - 1)!.name)
     }
   }
 
@@ -61,22 +62,20 @@ class ChooseStageScene extends React.PureComponent<{
     const { stages } = this.props
     const stageIndex = this.getCurrentStageIndex()
     if (stageIndex < stages.size - 1) {
-      this.onChoose(stages.get(stageIndex + 1).name)
+      this.onChoose(stages.get(stageIndex + 1)!.name)
     }
   }
 
   onStartPlay = () => {
-    const { dispatch, match, location } = this.props
-    const { stageName } = match.params
-    dispatch(push(`/stage/${stageName}${location.search}`))
+    const { dispatch, stageName, search } = this.props
+    dispatch(push(`/stage/${stageName}${search}`))
   }
 
   render() {
-    const { match, dispatch, stages } = this.props
+    const { stageName, dispatch, stages } = this.props
     const stageNames = stages.map(s => s.name)
-    const { stageName } = match.params
     if (!stageNames.includes(stageName)) {
-      return <Redirect to={`${match.url}/${stageNames.first()}`} />
+      return <Navigate to={`/choose/${stageNames.first()}`} replace />
     }
     const index = stageNames.indexOf(stageName)
     return (
@@ -130,6 +129,11 @@ class ChooseStageScene extends React.PureComponent<{
   }
 }
 
-const mapStateToProps = (state: State) => ({ stages: state.stages })
+const ConnectedInner = connect((state: State) => ({ stages: state.stages }))(ChooseStageSceneInner)
 
-export default connect(mapStateToProps)(ChooseStageScene)
+export default function ChooseStageScene() {
+  const { stageName } = useParams<{ stageName: string }>()
+  const location = useLocation()
+
+  return <ConnectedInner stageName={stageName || ''} search={location.search} />
+}

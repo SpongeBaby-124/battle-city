@@ -1,7 +1,7 @@
 import React from 'react'
 import { connect } from 'react-redux'
-import { push } from 'react-router-redux'
 import { Dispatch } from 'redux'
+import { push } from '../utils/router'
 import { TankRecord } from '../types'
 import {
   BLOCK_SIZE as B,

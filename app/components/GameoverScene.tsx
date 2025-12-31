@@ -1,6 +1,6 @@
 import React from 'react'
 import { connect } from 'react-redux'
-import { replace } from 'react-router-redux'
+import { replace } from '../utils/router'
 import { Dispatch } from 'redux'
 import { State } from '../reducers'
 import { GameRecord } from '../reducers/game'

@@ -1,6 +1,6 @@
 import { List } from 'immutable'
-import { routerReducer } from 'react-router-redux'
 import { combineReducers } from 'redux'
+import { routerReducer } from '../utils/history'
 import devOnly from '../components/dev-only/reducer'
 import MapRecord from '../types/MapRecord'
 import PlayerRecord from '../types/PlayerRecord'
