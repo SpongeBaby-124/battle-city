@@ -17,6 +17,15 @@ import powerUpManager from './powerUpManager'
 import stageSaga, { StageResult } from './stageSaga'
 import tickEmitter from './tickEmitter'
 
+// 联机模式下使用的控制配置（所有玩家使用同一套按键）
+const MULTIPLAYER_CONTROL_CONFIG = {
+  up: 'KeyW',
+  left: 'KeyA',
+  down: 'KeyS',
+  right: 'KeyD',
+  fire: 'KeyJ',
+}
+
 // 播放游戏结束的动画
 function* animateGameover() {
   const textId1 = getNextId('text')
@@ -81,9 +90,37 @@ export default function* gameSaga(action: actions.StartGame | actions.ResetGame)
   yield delay(0)
   DEV.LOG && console.log('GAME STARTED')
 
-  const players = [playerSaga('player-1', PLAYER_CONFIGS.player1)]
-  if (yield select(selectors.isInMultiPlayersMode)) {
-    players.push(playerSaga('player-2', PLAYER_CONFIGS.player2))
+  const state: State = yield select()
+  const isMultiplayer = state.multiplayer.enabled
+  const isMultiPlayersMode = yield select(selectors.isInMultiPlayersMode)
+
+  let players: any[]
+
+  if (isMultiplayer) {
+    // 联机模式：每个客户端只控制自己的坦克
+    const role = state.multiplayer.roomInfo?.role
+    if (role === 'host') {
+      // 主机控制 player-1，使用统一的控制配置
+      players = [playerSaga('player-1', {
+        ...PLAYER_CONFIGS.player1,
+        control: MULTIPLAYER_CONTROL_CONFIG,
+      })]
+    } else {
+      // 客机控制 player-2，使用统一的控制配置
+      players = [playerSaga('player-2', {
+        ...PLAYER_CONFIGS.player2,
+        control: MULTIPLAYER_CONTROL_CONFIG,
+      })]
+    }
+  } else if (isMultiPlayersMode) {
+    // 本地双人模式：两个玩家使用不同的按键
+    players = [
+      playerSaga('player-1', PLAYER_CONFIGS.player1),
+      playerSaga('player-2', PLAYER_CONFIGS.player2),
+    ]
+  } else {
+    // 单人模式
+    players = [playerSaga('player-1', PLAYER_CONFIGS.player1)]
   }
 
   const result = yield race({

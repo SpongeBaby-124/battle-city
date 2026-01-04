@@ -9,8 +9,9 @@ import {
   setRoomInfo,
   setOpponentConnected,
   setMultiplayerError,
+  setGameInitialState,
 } from '../utils/multiplayerActions';
-import { SocketEvent, ErrorResponse, RoomInfo } from '../types/multiplayer-types';
+import { SocketEvent, ErrorResponse, RoomInfo, GameInitialState } from '../types/multiplayer-types';
 import TextButton from './TextButton';
 import Text from './Text';
 import TextInput from './TextInput';
@@ -72,12 +73,18 @@ export default function MultiplayerLobby() {
       dispatch(setOpponentConnected(false));
     };
 
+    // 监听游戏初始状态（服务器同步）
+    const handleGameStateInit = (data: GameInitialState) => {
+      dispatch(setGameInitialState(data));
+    };
+
     socketService.on('status_change', handleStatusChange);
     socketService.on(SocketEvent.ROOM_CREATED, handleRoomCreated);
     socketService.on(SocketEvent.ROOM_JOINED, handleRoomJoined);
     socketService.on(SocketEvent.ROOM_ERROR, handleRoomError);
     socketService.on(SocketEvent.PLAYER_JOINED, handlePlayerJoined);
     socketService.on(SocketEvent.PLAYER_LEFT, handlePlayerLeft);
+    socketService.on(SocketEvent.GAME_STATE_INIT, handleGameStateInit);
 
     return () => {
       // 清理事件监听
@@ -87,6 +94,7 @@ export default function MultiplayerLobby() {
       socketService.off(SocketEvent.ROOM_ERROR, handleRoomError);
       socketService.off(SocketEvent.PLAYER_JOINED, handlePlayerJoined);
       socketService.off(SocketEvent.PLAYER_LEFT, handlePlayerLeft);
+      socketService.off(SocketEvent.GAME_STATE_INIT, handleGameStateInit);
 
       // 断开连接
       socketService.disconnect();
@@ -218,7 +226,6 @@ export default function MultiplayerLobby() {
             value={roomIdInput}
             onChange={setRoomIdInput}
             maxLength={6}
-            placeholder="6 digits"
           />
           <TextButton
             x={2 * B}

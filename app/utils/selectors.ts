@@ -11,6 +11,11 @@ import IndexHelper from './IndexHelper'
 import values from './values'
 
 export const isInMultiPlayersMode = (state: State) => {
+  // 联机模式下也是双人模式
+  if (state.multiplayer.enabled) {
+    return true
+  }
+  // 本地双人模式通过 URL 参数判断
   const params = new URLSearchParams(state.router.location.search)
   return params.has(MULTI_PLAYERS_SEARCH_KEY)
 }
