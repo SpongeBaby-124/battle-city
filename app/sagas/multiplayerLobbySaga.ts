@@ -1,13 +1,14 @@
 import { delay, put, race, select, take, call } from 'redux-saga/effects';
 import { push } from '../utils/router';
 import { State } from '../reducers';
-import { A } from '../utils/actions';
+import { A, startGame } from '../utils/actions';
 import {
   startGameCountdown,
   cancelGameCountdown,
   updateCountdown,
   multiplayerGameStart,
 } from '../utils/multiplayerActions';
+import { firstStageName } from '../stages';
 
 /**
  * 监听对手连接状态，当双方都连接时启动倒计时
@@ -45,9 +46,11 @@ function* watchOpponentConnection() {
         // 倒计时结束，启动游戏
         yield put(multiplayerGameStart());
         
+        // 发出startGame action启动游戏（从第一关开始）
+        yield put(startGame(0));
+        
         // 跳转到游戏场景
-        const currentState: State = yield select();
-        yield put(push(`/game${currentState.router.location.search}`));
+        yield put(push(`/stage/${firstStageName}`));
       }
     }
   }
