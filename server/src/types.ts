@@ -30,6 +30,7 @@ export interface PlayerInput {
   type: 'move' | 'fire' | 'direction';
   direction?: 'up' | 'down' | 'left' | 'right';
   timestamp: number;
+  sequenceId?: number; // 输入序列号（用于客户端预测）
 }
 
 // 游戏状态事件
@@ -59,6 +60,7 @@ export enum SocketEvent {
   // 输入同步
   PLAYER_INPUT = 'player_input',
   OPPONENT_INPUT = 'opponent_input',
+  INPUT_ACK = 'input_ack', // 输入确认（用于客户端预测校正）
   
   // 状态同步
   GAME_STATE_EVENT = 'game_state_event',

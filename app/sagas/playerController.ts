@@ -8,6 +8,19 @@ import fireController from './fireController'
 import { socketService } from '../utils/SocketService'
 import { State } from '../reducers'
 
+// 输入历史记录（用于客户端预测和状态校正）
+interface InputHistoryEntry {
+  sequenceId: number;
+  direction: Direction | null;
+  fire: boolean;
+  timestamp: number;
+  tankState: {
+    x: number;
+    y: number;
+    direction: Direction;
+  };
+}
+
 // 一个 playerController 实例对应一个人类玩家(用户)的控制器.
 // 参数playerName用来指定人类玩家的玩家名称, config为该玩家的操作配置.
 // playerController 将启动 fireController 与 directionController, 从而控制人类玩家的坦克
@@ -17,6 +30,8 @@ export default function* playerController(tankId: TankId, config: PlayerConfig) 
   const pressed: Direction[] = [] // 用来记录上一个tick内, 玩家按下过的方向键
   let lastSentInput: string | null = null // 上次发送的输入状态（用于节流）
   let inputSequenceId = 0 // 输入序列号
+  const inputHistory: InputHistoryEntry[] = [] // 输入历史记录（最多保存100个）
+  const MAX_HISTORY_SIZE = 100
 
   try {
     document.addEventListener('keydown', onKeyDown)
@@ -101,6 +116,12 @@ export default function* playerController(tankId: TankId, config: PlayerConfig) 
         continue
       }
       
+      // 获取当前坦克状态
+      const tank: TankRecord = yield select((s: State) => s.tanks.get(tankId))
+      if (!tank) {
+        continue
+      }
+      
       // 构建当前输入状态
       const currentDirection = pressed.length > 0 ? last(pressed) : null
       const currentFire = firePressing || firePressed
@@ -111,11 +132,36 @@ export default function* playerController(tankId: TankId, config: PlayerConfig) 
         lastSentInput = inputState
         inputSequenceId++
         
-        // 发送输入到服务器
+        // 记录输入历史（用于客户端预测和状态校正）
+        inputHistory.push({
+          sequenceId: inputSequenceId,
+          direction: currentDirection,
+          fire: currentFire,
+          timestamp: Date.now(),
+          tankState: {
+            x: tank.x,
+            y: tank.y,
+            direction: tank.direction,
+          },
+        })
+        
+        // 限制历史记录大小
+        if (inputHistory.length > MAX_HISTORY_SIZE) {
+          inputHistory.shift()
+        }
+        
+        // 发送输入到服务器（带序列号）
         socketService.sendPlayerInput({
           type: currentFire ? 'fire' : (currentDirection ? 'move' : 'direction'),
           direction: currentDirection || undefined,
           timestamp: Date.now(),
+          sequenceId: inputSequenceId,
+        })
+        
+        console.log(`[Client Prediction] Sent input #${inputSequenceId}:`, {
+          direction: currentDirection,
+          fire: currentFire,
+          position: { x: tank.x, y: tank.y },
         })
       }
     }

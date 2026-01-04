@@ -96,6 +96,7 @@ function handleBulletsCollidedWithBorder({ bulletCollisionInfo }: Stat, state: S
 function* destroySteels(collidedBullets: BulletsMap) {
   const {
     map: { steels },
+    multiplayer,
   }: State = yield select()
   const steelsNeedToDestroy: SteelIndex[] = []
   collidedBullets.forEach(bullet => {
@@ -110,12 +111,23 @@ function* destroySteels(collidedBullets: BulletsMap) {
 
   if (steelsNeedToDestroy.length > 0) {
     yield put(actions.removeSteels(ISet(steelsNeedToDestroy)))
+    
+    // 联机模式下发送地图破坏事件
+    if (multiplayer.enabled && multiplayer.roomInfo) {
+      const { socketService } = yield import('../utils/SocketService')
+      socketService.sendGameStateEvent({
+        type: 'steels_removed',
+        data: { steels: steelsNeedToDestroy },
+        timestamp: Date.now(),
+      })
+    }
   }
 }
 
 function* destroyBricks(collidedBullets: BulletsMap) {
   const {
     map: { bricks },
+    multiplayer,
   }: State = yield select()
   const bricksNeedToDestroy: BrickIndex[] = []
 
@@ -130,18 +142,40 @@ function* destroyBricks(collidedBullets: BulletsMap) {
 
   if (bricksNeedToDestroy.length > 0) {
     yield put(actions.removeBricks(ISet(bricksNeedToDestroy)))
+    
+    // 联机模式下发送地图破坏事件
+    if (multiplayer.enabled && multiplayer.roomInfo) {
+      const { socketService } = yield import('../utils/SocketService')
+      socketService.sendGameStateEvent({
+        type: 'bricks_removed',
+        data: { bricks: bricksNeedToDestroy },
+        timestamp: Date.now(),
+      })
+    }
   }
 }
 
 function* destroyEagleIfNeeded(expBullets: BulletsMap) {
   const {
     map: { eagle },
+    multiplayer,
   }: State = yield select()
   const eagleBox = asRect(eagle)
   for (const bullet of expBullets.values()) {
     const spreaded = spreadBullet(bullet)
     if (testCollide(eagleBox, spreaded)) {
       yield put(actions.destroyEagle())
+      
+      // 联机模式下发送老鹰被摧毁事件
+      if (multiplayer.enabled && multiplayer.roomInfo) {
+        const { socketService } = yield import('../utils/SocketService')
+        socketService.sendGameStateEvent({
+          type: 'eagle_destroyed',
+          data: {},
+          timestamp: Date.now(),
+        })
+      }
+      
       // DESTROY_EAGLE被dispatch之后将会触发游戏失败的流程
       return
     }

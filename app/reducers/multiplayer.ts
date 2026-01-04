@@ -18,6 +18,7 @@ export interface MultiplayerState {
   networkStats: NetworkStats; // 网络统计
   gameInitialState: GameInitialState | null; // 游戏初始状态
   opponentConnected: boolean; // 对手是否连接
+  opponentDisconnected: boolean; // 对手是否断线（游戏中断线）
   error: string | null; // 错误信息
   isCountingDown: boolean; // 是否正在倒计时
   countdown: number; // 倒计时秒数
@@ -34,6 +35,7 @@ const defaultMultiplayerState: MultiplayerState = {
   },
   gameInitialState: null,
   opponentConnected: false,
+  opponentDisconnected: false,
   error: null,
   isCountingDown: false,
   countdown: 0,
@@ -46,6 +48,7 @@ export class MultiplayerRecord extends Record(defaultMultiplayerState) implement
   readonly networkStats!: NetworkStats;
   readonly gameInitialState!: GameInitialState | null;
   readonly opponentConnected!: boolean;
+  readonly opponentDisconnected!: boolean;
   readonly error!: string | null;
   readonly isCountingDown!: boolean;
   readonly countdown!: number;
@@ -72,6 +75,8 @@ export default function multiplayer(
     return state.set('gameInitialState', action.initialState);
   } else if (action.type === A.SetOpponentConnected) {
     return state.set('opponentConnected', action.connected);
+  } else if (action.type === A.SetOpponentDisconnected) {
+    return state.set('opponentDisconnected', action.disconnected);
   } else if (action.type === A.SetMultiplayerError) {
     return state.set('error', action.error);
   } else if (action.type === A.UpdateNetworkStats) {

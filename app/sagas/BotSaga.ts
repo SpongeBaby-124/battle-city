@@ -31,6 +31,22 @@ export default function* botSaga(tankId: TankId) {
       if (result.killed.method === 'bullet') {
         yield scoreFromKillTank(tank)
       }
+      
+      // 联机模式下发送敌人摧毁事件
+      const state: State = yield select()
+      if (state.multiplayer.enabled && state.multiplayer.roomInfo) {
+        const { socketService } = yield import('../utils/SocketService')
+        socketService.sendGameStateEvent({
+          type: 'enemy_destroy',
+          data: {
+            tankId: tank.tankId,
+            x: tank.x,
+            y: tank.y,
+            level: tank.level,
+          },
+          timestamp: Date.now(),
+        })
+      }
     }
     yield put(actions.reqAddBot())
   } finally {

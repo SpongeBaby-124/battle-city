@@ -9,6 +9,7 @@ import { frame as f } from '../utils/common'
 import * as selectors from '../utils/selectors'
 import Timing from '../utils/Timing'
 import animateStatistics from './animateStatistics'
+import { socketService } from '../utils/SocketService'
 
 function* animateCurtainAndLoadMap(stage: StageConfig) {
   try {
@@ -63,6 +64,14 @@ export default function* stageSaga(stage: StageConfig) {
           if (yield select(selectors.isAllBotDead)) {
             yield Timing.delay(DEV.FAST ? 1000 : 4000)
             yield animateStatistics()
+            
+            // 联机模式下通知服务器游戏结束
+            const state: State = yield select()
+            if (state.multiplayer.enabled && state.multiplayer.roomInfo) {
+              const role = state.multiplayer.roomInfo.role
+              socketService.sendGameOver(role, 'all_enemies_defeated')
+            }
+            
             yield put(actions.beforeEndStage())
             yield put(actions.endStage())
             return { pass: true } as StageResult
@@ -71,11 +80,28 @@ export default function* stageSaga(stage: StageConfig) {
           if (yield select(selectors.isAllPlayerDead)) {
             yield Timing.delay(DEV.FAST ? 1000 : 3000)
             yield animateStatistics()
+            
+            // 联机模式下通知服务器游戏结束
+            const state: State = yield select()
+            if (state.multiplayer.enabled && state.multiplayer.roomInfo) {
+              const role = state.multiplayer.roomInfo.role
+              const opponentRole = role === 'host' ? 'guest' : 'host'
+              socketService.sendGameOver(opponentRole, 'all_players_dead')
+            }
+            
             // 因为 gameSaga 会 put END_GAME 所以这里不需要 put END_STAGE
             return { pass: false, reason: 'dead' } as StageResult
           }
         }
       } else if (action.type === A.DestroyEagle) {
+        // 联机模式下通知服务器游戏结束
+        const state: State = yield select()
+        if (state.multiplayer.enabled && state.multiplayer.roomInfo) {
+          const role = state.multiplayer.roomInfo.role
+          const opponentRole = role === 'host' ? 'guest' : 'host'
+          socketService.sendGameOver(opponentRole, 'eagle_destroyed')
+        }
+        
         // 因为 gameSaga 会 put END_GAME 所以这里不需要 put END_STAGE
         return { pass: false, reason: 'eagle-destroyed' } as StageResult
       }

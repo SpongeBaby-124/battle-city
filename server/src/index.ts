@@ -45,6 +45,102 @@ const io = new SocketIOServer(httpServer, {
   pingInterval: 25000,
 });
 
+// 敌人生成定时器映射
+const enemySpawnTimers = new Map<string, NodeJS.Timeout>();
+
+// 状态同步定时器映射
+const stateSyncTimers = new Map<string, NodeJS.Timeout>();
+
+// 启动敌人生成定时器
+function startEnemySpawnTimer(roomId: string): void {
+  // 清除已存在的定时器
+  stopEnemySpawnTimer(roomId);
+  
+  // 初始生成4个敌人
+  for (let i = 0; i < 4; i++) {
+    const enemyData = gameStateManager.spawnNextEnemy(roomId);
+    if (enemyData) {
+      io.to(roomId).emit(SocketEvent.GAME_STATE_EVENT, {
+        type: 'enemy_spawn',
+        data: enemyData,
+        timestamp: Date.now(),
+      });
+    }
+  }
+  
+  // 每3秒生成一个新敌人
+  const timer = setInterval(() => {
+    const room = roomManager.getRoom(roomId);
+    if (!room || room.status !== 'playing') {
+      stopEnemySpawnTimer(roomId);
+      return;
+    }
+    
+    const enemyData = gameStateManager.spawnNextEnemy(roomId);
+    if (enemyData) {
+      io.to(roomId).emit(SocketEvent.GAME_STATE_EVENT, {
+        type: 'enemy_spawn',
+        data: enemyData,
+        timestamp: Date.now(),
+      });
+      Logger.info(`Enemy spawned in room ${roomId}:`, enemyData);
+    } else {
+      // 没有更多敌人，停止定时器
+      Logger.info(`All enemies spawned in room ${roomId}`);
+      stopEnemySpawnTimer(roomId);
+    }
+  }, 3000);
+  
+  enemySpawnTimers.set(roomId, timer);
+  Logger.info(`Enemy spawn timer started for room ${roomId}`);
+}
+
+// 停止敌人生成定时器
+function stopEnemySpawnTimer(roomId: string): void {
+  const timer = enemySpawnTimers.get(roomId);
+  if (timer) {
+    clearInterval(timer);
+    enemySpawnTimers.delete(roomId);
+    Logger.info(`Enemy spawn timer stopped for room ${roomId}`);
+  }
+}
+
+// 启动状态同步定时器
+function startStateSyncTimer(roomId: string): void {
+  // 清除已存在的定时器
+  stopStateSyncTimer(roomId);
+  
+  // 每5秒发送一次状态同步请求
+  const timer = setInterval(() => {
+    const room = roomManager.getRoom(roomId);
+    if (!room || room.status !== 'playing') {
+      stopStateSyncTimer(roomId);
+      return;
+    }
+    
+    // 请求客户端发送当前状态快照
+    io.to(roomId).emit(SocketEvent.STATE_SYNC, {
+      timestamp: Date.now(),
+      requestSnapshot: true,
+    });
+    
+    Logger.debug(`State sync requested for room ${roomId}`);
+  }, 5000);
+  
+  stateSyncTimers.set(roomId, timer);
+  Logger.info(`State sync timer started for room ${roomId}`);
+}
+
+// 停止状态同步定时器
+function stopStateSyncTimer(roomId: string): void {
+  const timer = stateSyncTimers.get(roomId);
+  if (timer) {
+    clearInterval(timer);
+    stateSyncTimers.delete(roomId);
+    Logger.info(`State sync timer stopped for room ${roomId}`);
+  }
+}
+
 // Socket.IO连接处理
 io.on('connection', (socket) => {
   Logger.info(`Client connected: ${socket.id}`);
@@ -108,12 +204,21 @@ io.on('connection', (socket) => {
           // 生成游戏初始状态
           const initialState = gameStateManager.generateInitialState(roomId);
           
+          // 初始化敌人队列
+          gameStateManager.initializeEnemyQueue(roomId);
+          
           // 通知所有玩家游戏开始并发送初始状态
           io.to(roomId).emit(SocketEvent.GAME_START, {
             timestamp: Date.now(),
           });
           
           io.to(roomId).emit(SocketEvent.GAME_STATE_INIT, initialState);
+          
+          // 启动敌人生成定时器（每3秒生成一个敌人）
+          startEnemySpawnTimer(roomId);
+          
+          // 启动状态同步定时器（每5秒同步一次）
+          startStateSyncTimer(roomId);
           
           Logger.info(`Game started in room: ${roomId} with initial state`);
         }
@@ -134,6 +239,15 @@ io.on('connection', (socket) => {
     try {
       const roomId = roomManager.getRoomIdBySocket(socket.id);
       if (roomId) {
+        // 停止敌人生成定时器
+        stopEnemySpawnTimer(roomId);
+        
+        // 停止状态同步定时器
+        stopStateSyncTimer(roomId);
+        
+        // 清理敌人队列
+        gameStateManager.clearEnemyQueue(roomId);
+        
         // 通知房间内其他玩家
         socket.to(roomId).emit(SocketEvent.PLAYER_LEFT);
         
@@ -223,6 +337,14 @@ io.on('connection', (socket) => {
 
       // 广播给房间内的对手
       socket.to(roomId).emit(SocketEvent.OPPONENT_INPUT, inputWithTimestamp);
+      
+      // 如果输入包含序列号，发送确认给发送者（用于客户端预测校正）
+      if (data.sequenceId !== undefined) {
+        socket.emit(SocketEvent.INPUT_ACK, {
+          sequenceId: data.sequenceId,
+          timestamp: Date.now(),
+        });
+      }
 
       Logger.debug(`Player input: ${socket.id}, type: ${data.type}, direction: ${data.direction}`);
     } catch (error) {
@@ -310,6 +432,16 @@ io.on('connection', (socket) => {
           for (const player of room.players.values()) {
             if (player.socketId === socket.id && player.status === 'disconnected') {
               Logger.info(`Player timeout: ${socket.id}, removing from room ${roomId}`);
+              
+              // 停止敌人生成定时器
+              stopEnemySpawnTimer(roomId);
+              
+              // 停止状态同步定时器
+              stopStateSyncTimer(roomId);
+              
+              // 清理敌人队列
+              gameStateManager.clearEnemyQueue(roomId);
+              
               roomManager.leaveRoom(socket.id);
               io.to(roomId).emit(SocketEvent.PLAYER_LEFT);
               break;

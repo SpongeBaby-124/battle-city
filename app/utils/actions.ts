@@ -107,6 +107,7 @@ export enum A {
   SetRoomInfo = 'SetRoomInfo',
   SetGameInitialState = 'SetGameInitialState',
   SetOpponentConnected = 'SetOpponentConnected',
+  SetOpponentDisconnected = 'SetOpponentDisconnected',
   SetMultiplayerError = 'SetMultiplayerError',
   UpdateNetworkStats = 'UpdateNetworkStats',
   StartGameCountdown = 'StartGameCountdown',

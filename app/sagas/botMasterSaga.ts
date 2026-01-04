@@ -16,7 +16,13 @@ function* addBotHelper() {
   try {
     while (true) {
       yield take(reqChannel)
-      const { game, stages }: State = yield select()
+      const { game, stages, multiplayer }: State = yield select()
+      
+      // 联机模式下禁用本地敌人生成，由服务端控制
+      if (multiplayer.enabled && multiplayer.roomInfo) {
+        continue
+      }
+      
       if (!game.remainingBots.isEmpty()) {
         let spawnPos: Point = yield select(selectors.availableSpawnPosition)
         while (spawnPos == null) {

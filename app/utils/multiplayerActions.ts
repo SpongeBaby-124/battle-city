@@ -44,6 +44,13 @@ export function setOpponentConnected(connected: boolean) {
 }
 
 /**
+ * 设置对手断线状态
+ */
+export function setOpponentDisconnected(disconnected: boolean) {
+  return { type: A.SetOpponentDisconnected, disconnected };
+}
+
+/**
  * 设置联机错误
  */
 export function setMultiplayerError(error: string | null) {

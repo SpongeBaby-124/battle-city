@@ -1,0 +1,164 @@
+.network-status {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid #333;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  color: #fff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s ease;
+}
+
+.network-status.warning {
+  border-color: #ff6b6b;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 4px 8px rgba(255, 107, 107, 0.5);
+  }
+  50% {
+    box-shadow: 0 4px 16px rgba(255, 107, 107, 0.8);
+  }
+}
+
+.network-status-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 连接状态指示器 */
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #666;
+  animation: blink 1.5s infinite;
+}
+
+.status-indicator.connected .status-dot {
+  background: #51cf66;
+  animation: none;
+}
+
+.status-indicator.connecting .status-dot,
+.status-indicator.reconnecting .status-dot {
+  background: #ffd43b;
+}
+
+.status-indicator.disconnected .status-dot,
+.status-indicator.error .status-dot {
+  background: #ff6b6b;
+}
+
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.status-text {
+  color: #ccc;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Ping值显示 */
+.ping-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ping-display.good {
+  border-left: 3px solid #51cf66;
+}
+
+.ping-display.medium {
+  border-left: 3px solid #ffd43b;
+}
+
+.ping-display.bad {
+  border-left: 3px solid #ff6b6b;
+}
+
+.ping-label {
+  color: #999;
+}
+
+.ping-value {
+  color: #fff;
+  font-weight: bold;
+}
+
+.ping-display.good .ping-value {
+  color: #51cf66;
+}
+
+.ping-display.medium .ping-value {
+  color: #ffd43b;
+}
+
+.ping-display.bad .ping-value {
+  color: #ff6b6b;
+}
+
+/* 警告消息 */
+.warning-message {
+  padding: 4px 8px;
+  background: rgba(255, 107, 107, 0.2);
+  border-radius: 4px;
+  color: #ff6b6b;
+  font-size: 8px;
+  text-align: center;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .network-status {
+    top: 8px;
+    right: 8px;
+    padding: 6px 10px;
+    font-size: 8px;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+  }
+
+  .warning-message {
+    font-size: 7px;
+  }
+}
