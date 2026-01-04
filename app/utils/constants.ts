@@ -12,8 +12,8 @@ export const FIELD_SIZE = BLOCK_SIZE * FIELD_BLOCK_SIZE
 export const BULLET_SIZE = 3
 /** 摧毁steel的最低子弹power值 */
 export const STEEL_POWER = 3
-
-export const ZOOM_LEVEL = 2
+/** 修改页面大小 */
+export const ZOOM_LEVEL = 3
 export const SCREEN_WIDTH = 16 * BLOCK_SIZE
 export const SCREEN_HEIGHT = 15 * BLOCK_SIZE
 
