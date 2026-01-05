@@ -164,8 +164,13 @@ function rotate(bullet: BulletRecord) {
   })
 }
 
-// fixme 有的时候会发生 stack overflow
-function calculateHitTime(b1: BulletRecord, b2: BulletRecord): number {
+// 修复: 添加递归深度保护，防止 stack overflow
+function calculateHitTime(b1: BulletRecord, b2: BulletRecord, depth: number = 0): number {
+  // 防止无限递归（最多旋转3次）
+  if (depth > 3) {
+    return -1
+  }
+
   if (b1.direction === 'up') {
     if (b2.direction === 'down') {
       // 两个子弹相向而行, 一定会发生碰撞
@@ -182,7 +187,7 @@ function calculateHitTime(b1: BulletRecord, b2: BulletRecord): number {
         return (b2.lastY - b1.lastY - BULLET_SIZE) / (b2.speed - b1.speed)
       } else {
         // 递归 b1从下方追赶b2
-        return calculateHitTime(b2, b1)
+        return calculateHitTime(b2, b1, depth + 1)
       }
     } else if (b2.direction === 'left') {
       // [x] <--- b2
@@ -228,7 +233,7 @@ function calculateHitTime(b1: BulletRecord, b2: BulletRecord): number {
     }
   } else {
     // 旋啊旋. 旋转到b1 向上飞的时候...
-    return calculateHitTime(rotate(b1), rotate(b2))
+    return calculateHitTime(rotate(b1), rotate(b2), depth + 1)
   }
 }
 

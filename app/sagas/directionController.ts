@@ -37,6 +37,11 @@ export default function* directionController(
     const { delta }: actions.Tick = yield take(A.Tick)
     const tank = yield select((s: State) => s.tanks.get(tankId))
 
+    // 坦克可能还未创建或已被销毁
+    if (!tank) {
+      continue
+    }
+
     const input: Input = getPlayerInput(tank, delta)
 
     if (input == null) {

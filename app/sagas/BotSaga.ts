@@ -70,7 +70,8 @@ export default function* botSaga(tankId: TankId) {
       const { bulletId }: actions.BeforeRemoveBullet = yield take(actions.A.BeforeRemoveBullet)
       const { bullets }: State = yield select()
       const bullet = bullets.get(bulletId)
-      if (bullet.tankId === tankId) {
+      // 添加空值检查：子弹可能已被删除
+      if (bullet && bullet.tankId === tankId) {
         ctx.noteChannel.put({ type: 'bullet-complete', bullet })
       }
     }
