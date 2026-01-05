@@ -169,6 +169,11 @@ export class SocketService {
       this.emit(SocketEvent.GAME_STATE_EVENT, data);
     });
 
+    // 服务器状态同步（服务器权威模式）
+    this.socket.on(SocketEvent.STATE_SYNC, (data: any) => {
+      this.emit(SocketEvent.STATE_SYNC, data);
+    });
+
     // Pong响应
     this.socket.on(SocketEvent.PONG, (data) => {
       this.emit(SocketEvent.PONG, data);

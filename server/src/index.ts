@@ -7,6 +7,7 @@ import { Logger } from './logger';
 import { RoomManager } from './RoomManager';
 import { InputValidator } from './InputValidator';
 import { GameStateManager } from './GameStateManager';
+import { GameEngine } from './GameEngine';
 import { SocketEvent, ErrorType, PlayerInput, GameStateEvent } from './types';
 
 // 创建Express应用
@@ -25,10 +26,16 @@ inputValidator.startCleanup();
 // 创建游戏状态管理器
 const gameStateManager = new GameStateManager();
 
+// 游戏引擎映射（roomId -> GameEngine）
+const gameEngines: Map<string, GameEngine> = new Map();
+
+// 状态广播定时器映射（roomId -> NodeJS.Timeout）
+const broadcastIntervals: Map<string, NodeJS.Timeout> = new Map();
+
 // 健康检查端点
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: Date.now(),
     rooms: roomManager.getRoomCount(),
     players: roomManager.getPlayerCount(),
@@ -53,17 +60,17 @@ io.on('connection', (socket) => {
   socket.on(SocketEvent.CREATE_ROOM, () => {
     try {
       const { roomId, sessionId } = roomManager.createRoom(socket.id);
-      
+
       // 加入Socket.IO房间
       socket.join(roomId);
-      
+
       // 返回房间信息
       socket.emit(SocketEvent.ROOM_CREATED, {
         roomId,
         sessionId,
         role: 'host',
       });
-      
+
       Logger.info(`Room created: ${roomId} by ${socket.id}`);
     } catch (error) {
       Logger.error(`Error creating room: ${socket.id}`, error);
@@ -79,46 +86,60 @@ io.on('connection', (socket) => {
     try {
       const { roomId } = data;
       const result = roomManager.joinRoom(roomId, socket.id);
-      
+
       // 检查是否有错误
       if ('type' in result) {
         socket.emit(SocketEvent.ROOM_ERROR, result);
         return;
       }
-      
+
       // 加入Socket.IO房间
       socket.join(roomId);
-      
+
       // 通知加入者
       socket.emit(SocketEvent.ROOM_JOINED, {
         roomId,
         sessionId: result.sessionId,
         role: 'guest',
       });
-      
+
       // 通知房间内其他玩家
       socket.to(roomId).emit(SocketEvent.PLAYER_JOINED, {
         role: 'guest',
       });
-      
+
       // 检查是否可以开始游戏
       const room = roomManager.getRoom(roomId);
       if (room && room.players.size === config.room.maxPlayers) {
         if (roomManager.startGame(roomId)) {
+          // 创建并启动游戏引擎
+          const engine = new GameEngine(roomId);
+          gameEngines.set(roomId, engine);
+          engine.start();
+
           // 生成游戏初始状态
           const initialState = gameStateManager.generateInitialState(roomId);
-          
+
           // 通知所有玩家游戏开始并发送初始状态
           io.to(roomId).emit(SocketEvent.GAME_START, {
             timestamp: Date.now(),
           });
-          
+
           io.to(roomId).emit(SocketEvent.GAME_STATE_INIT, initialState);
-          
-          Logger.info(`Game started in room: ${roomId} with initial state`);
+
+          // 启动状态广播（每16ms，约60FPS）
+          const broadcastInterval = setInterval(() => {
+            const gameEngine = gameEngines.get(roomId);
+            if (gameEngine) {
+              io.to(roomId).emit(SocketEvent.STATE_SYNC, gameEngine.getState());
+            }
+          }, 16);
+          broadcastIntervals.set(roomId, broadcastInterval);
+
+          Logger.info(`Game started in room: ${roomId} with server game engine`);
         }
       }
-      
+
       Logger.info(`Player joined room: ${roomId}, socket: ${socket.id}`);
     } catch (error) {
       Logger.error(`Error joining room: ${socket.id}`, error);
@@ -136,13 +157,27 @@ io.on('connection', (socket) => {
       if (roomId) {
         // 通知房间内其他玩家
         socket.to(roomId).emit(SocketEvent.PLAYER_LEFT);
-        
+
         // 离开Socket.IO房间
         socket.leave(roomId);
-        
+
         // 从房间管理器中移除
         roomManager.leaveRoom(socket.id);
-        
+
+        // 清理游戏引擎
+        const gameEngine = gameEngines.get(roomId);
+        if (gameEngine) {
+          gameEngine.stop();
+          gameEngines.delete(roomId);
+        }
+
+        // 清理广播定时器
+        const broadcastInterval = broadcastIntervals.get(roomId);
+        if (broadcastInterval) {
+          clearInterval(broadcastInterval);
+          broadcastIntervals.delete(roomId);
+        }
+
         Logger.info(`Player left room: ${roomId}, socket: ${socket.id}`);
       }
     } catch (error) {
@@ -155,27 +190,27 @@ io.on('connection', (socket) => {
     try {
       const { sessionId } = data;
       const result = roomManager.reconnect(sessionId, socket.id);
-      
+
       // 检查是否有错误
       if ('type' in result) {
         socket.emit(SocketEvent.RECONNECT_FAILED, result);
         return;
       }
-      
+
       const { roomId, role } = result;
-      
+
       // 重新加入Socket.IO房间
       socket.join(roomId);
-      
+
       // 通知重连成功
       socket.emit(SocketEvent.RECONNECT_SUCCESS, {
         roomId,
         role,
       });
-      
+
       // 通知对手玩家重连
       socket.to(roomId).emit(SocketEvent.OPPONENT_RECONNECTED);
-      
+
       Logger.info(`Player reconnected: ${socket.id}, room: ${roomId}, role: ${role}`);
     } catch (error) {
       Logger.error(`Error reconnecting: ${socket.id}`, error);
@@ -215,16 +250,32 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // 添加服务器时间戳
-      const inputWithTimestamp: PlayerInput = {
-        ...data,
-        timestamp: Date.now(),
-      };
+      // 获取玩家角色
+      const room = roomManager.getRoom(roomId);
+      if (!room) {
+        return;
+      }
 
-      // 广播给房间内的对手
-      socket.to(roomId).emit(SocketEvent.OPPONENT_INPUT, inputWithTimestamp);
+      let playerRole: 'host' | 'guest' | null = null;
+      for (const [role, player] of room.players.entries()) {
+        if (player.socketId === socket.id) {
+          playerRole = role;
+          break;
+        }
+      }
 
-      Logger.debug(`Player input: ${socket.id}, type: ${data.type}, direction: ${data.direction}`);
+      if (!playerRole) {
+        Logger.warn(`Could not determine player role for socket: ${socket.id}`);
+        return;
+      }
+
+      // 将输入发送给游戏引擎
+      const gameEngine = gameEngines.get(roomId);
+      if (gameEngine) {
+        gameEngine.handleInput(playerRole, data);
+      }
+
+      Logger.debug(`Player input: ${socket.id}, role: ${playerRole}, direction: ${data.direction}`);
     } catch (error) {
       Logger.error(`Error handling player input: ${socket.id}`, error);
     }
@@ -290,18 +341,18 @@ io.on('connection', (socket) => {
   // 断开连接
   socket.on('disconnect', (reason) => {
     Logger.info(`Client disconnected: ${socket.id}, reason: ${reason}`);
-    
+
     // 清理输入验证器的速率记录
     inputValidator.clearRateLimit(socket.id);
-    
+
     const roomId = roomManager.getRoomIdBySocket(socket.id);
     if (roomId) {
       // 更新玩家状态为断开
       roomManager.updatePlayerStatus(socket.id, 'disconnected');
-      
+
       // 通知对手玩家断线
       socket.to(roomId).emit(SocketEvent.OPPONENT_DISCONNECTED);
-      
+
       // 设置超时，如果30秒内未重连则移除玩家
       setTimeout(() => {
         const room = roomManager.getRoom(roomId);

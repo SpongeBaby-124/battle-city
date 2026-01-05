@@ -9,20 +9,20 @@ export enum SocketEvent {
   ROOM_ERROR = 'room_error',
   PLAYER_JOINED = 'player_joined',
   PLAYER_LEFT = 'player_left',
-  
+
   // 游戏控制
   GAME_START = 'game_start',
   GAME_OVER = 'game_over',
   GAME_STATE_INIT = 'game_state_init',
-  
+
   // 输入同步
   PLAYER_INPUT = 'player_input',
   OPPONENT_INPUT = 'opponent_input',
-  
+
   // 状态同步
   GAME_STATE_EVENT = 'game_state_event',
-  STATE_SYNC = 'state_sync',
-  
+  STATE_SYNC = 'state_sync',  // 服务器权威模式：接收完整状态
+
   // 连接管理
   PING = 'ping',
   PONG = 'pong',
@@ -49,7 +49,7 @@ export interface PlayerInput {
 }
 
 // 游戏状态事件类型
-export type GameStateEventType = 
+export type GameStateEventType =
   | 'tank_spawn'      // 坦克生成
   | 'tank_move'       // 坦克移动（用于AI坦克同步）
   | 'tank_fire'       // 坦克开火
@@ -107,4 +107,75 @@ export interface NetworkStats {
   ping: number; // 延迟（毫秒）
   lastPingTime: number; // 上次ping时间
   connectionStatus: ConnectionStatus;
+}
+
+// ==================== 服务器权威模式类型 ====================
+
+// 方向类型
+export type Direction = 'up' | 'down' | 'left' | 'right';
+
+// 坦克阵营
+export type TankSide = 'player' | 'bot';
+
+// 坦克等级
+export type TankLevel = 'basic' | 'fast' | 'power' | 'armor';
+
+// 坦克颜色
+export type TankColor = 'yellow' | 'green' | 'silver' | 'red';
+
+// 服务器坦克状态
+export interface ServerTankState {
+  tankId: number;
+  x: number;
+  y: number;
+  direction: Direction;
+  moving: boolean;
+  alive: boolean;
+  side: TankSide;
+  level: TankLevel;
+  color: TankColor;
+  hp: number;
+  helmetDuration: number;
+  frozenTimeout: number;
+  cooldown: number;
+  withPowerUp: boolean;
+}
+
+// 服务器子弹状态
+export interface ServerBulletState {
+  bulletId: number;
+  x: number;
+  y: number;
+  direction: Direction;
+  speed: number;
+  tankId: number;
+  power: number;
+}
+
+// 服务器地图状态
+export interface ServerMapState {
+  bricks: boolean[];
+  steels: boolean[];
+  eagleBroken: boolean;
+}
+
+// 服务器玩家信息
+export interface ServerPlayerState {
+  lives: number;
+  score: number;
+  activeTankId: number | null;
+}
+
+// 服务器状态同步负载
+export interface ServerStateSyncPayload {
+  tanks: ServerTankState[];
+  bullets: ServerBulletState[];
+  map: ServerMapState;
+  players: {
+    host: ServerPlayerState;
+    guest: ServerPlayerState;
+  };
+  remainingBots: number;
+  gameStatus: 'waiting' | 'playing' | 'paused' | 'finished';
+  timestamp: number;
 }

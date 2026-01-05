@@ -18,27 +18,27 @@ export default function* playerController(tankId: TankId, config: PlayerConfig) 
   const pressed: Direction[] = [] // 用来记录上一个tick内, 玩家按下过的方向键
   let lastSentInput: string | null = null // 上次发送的输入状态（用于节流）
 
-  // 检查是否为 Guest 模式
-  const isGuest: boolean = yield select(selectors.isGuest)
+  // 检查是否为联机模式（服务器权威模式）
+  const multiplayerState: State['multiplayer'] = yield select((s: State) => s.multiplayer)
+  const isOnlineMultiplayer = multiplayerState.enabled && multiplayerState.roomInfo != null
 
   try {
     document.addEventListener('keydown', onKeyDown)
     document.addEventListener('keyup', onKeyUp)
 
-    if (isGuest) {
-      // Guest 模式：只发送输入到 Host，不运行本地控制器
-      // 本地坦克状态由 Host 广播同步
+    if (isOnlineMultiplayer) {
+      // 服务器权威模式：只发送输入到服务器
+      // 坦克状态由服务器广播同步
       yield all([
         resetFirePressedEveryTick(),
         sendInputToServer(),
       ])
     } else {
-      // Host 模式或单机模式：运行本地控制器 + 发送输入
+      // 单机模式或本地双人模式：运行本地控制器
       yield all([
         directionController(tankId, getPlayerInput),
         fireController(tankId, () => firePressed || firePressing),
         resetFirePressedEveryTick(),
-        sendInputToServer(),
       ])
     }
   } finally {
@@ -125,16 +125,11 @@ export default function* playerController(tankId: TankId, config: PlayerConfig) 
       if (inputState !== lastSentInput) {
         lastSentInput = inputState
 
-        // 获取当前坦克信息
-        const tank = yield select((s: State) => {
-          const player = state.multiplayer.roomInfo?.role === 'host' ? s.player1 : s.player2
-          return player?.activeTankId ? s.tanks.get(player.activeTankId) : null
-        })
-
-        // 发送完整输入状态到服务器
+        // 发送当前输入状态到服务器
+        // direction 为 null 时服务器会保持坦克当前方向
         socketService.sendPlayerInput({
           type: 'state',
-          direction: currentDirection || (tank?.direction as any) || undefined,
+          direction: currentDirection || undefined,
           moving: isMoving,
           firing: isFiring,
           timestamp: Date.now(),

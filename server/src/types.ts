@@ -104,3 +104,87 @@ export interface ErrorResponse {
   type: ErrorType;
   message: string;
 }
+
+// ==================== 游戏状态类型 ====================
+
+// 方向类型
+export type Direction = 'up' | 'down' | 'left' | 'right';
+
+// 坦克阵营
+export type TankSide = 'player' | 'bot';
+
+// 坦克等级
+export type TankLevel = 'basic' | 'fast' | 'power' | 'armor';
+
+// 坦克颜色
+export type TankColor = 'yellow' | 'green' | 'silver' | 'red';
+
+// 坦克状态
+export interface TankState {
+  tankId: number;
+  x: number;
+  y: number;
+  direction: Direction;
+  moving: boolean;
+  alive: boolean;
+  side: TankSide;
+  level: TankLevel;
+  color: TankColor;
+  hp: number;
+  helmetDuration: number;
+  frozenTimeout: number;
+  cooldown: number;
+  withPowerUp: boolean;
+}
+
+// 子弹状态
+export interface BulletState {
+  bulletId: number;
+  x: number;
+  y: number;
+  direction: Direction;
+  speed: number;
+  tankId: number;
+  power: number;
+}
+
+// 地图状态
+export interface MapState {
+  bricks: boolean[];
+  steels: boolean[];
+  eagleBroken: boolean;
+}
+
+// 玩家信息
+export interface PlayerState {
+  lives: number;
+  score: number;
+  activeTankId: number | null;
+}
+
+// 完整游戏状态
+export interface GameState {
+  tanks: TankState[];
+  bullets: BulletState[];
+  map: MapState;
+  players: {
+    host: PlayerState;
+    guest: PlayerState;
+  };
+  remainingBots: number;
+  gameStatus: 'waiting' | 'playing' | 'paused' | 'finished';
+}
+
+// 状态同步负载（发送给客户端）
+export interface StateSyncPayload {
+  tanks: TankState[];
+  bullets: BulletState[];
+  map: MapState;
+  players: {
+    host: PlayerState;
+    guest: PlayerState;
+  };
+  remainingBots: number;
+  gameStatus: 'waiting' | 'playing' | 'paused' | 'finished';
+  timestamp: number;
+}

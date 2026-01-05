@@ -6,7 +6,7 @@ import TextRecord from '../types/TextRecord'
 import * as actions from '../utils/actions'
 import { A } from '../utils/actions'
 import { getNextId } from '../utils/common'
-import { BLOCK_SIZE, PLAYER_CONFIGS } from '../utils/constants'
+import { BLOCK_SIZE, PLAYER_CONFIGS, MULTIPLAYER_CONFIG } from '../utils/constants'
 import * as selectors from '../utils/selectors'
 import Timing from '../utils/Timing'
 import botMasterSaga from './botMasterSaga'
@@ -81,16 +81,28 @@ export default function* gameSaga(action: actions.StartGame | actions.ResetGame)
   yield delay(0)
   DEV.LOG && console.log('GAME STARTED')
 
-  // 检查是否为联机 Guest 模式
-  const isGuest: boolean = yield select(selectors.isGuest)
+  // 检查是否为联机模式（服务器权威模式）
+  const isMultiplayerMode: boolean = yield select(selectors.isInMultiPlayersMode)
+  const multiplayerState: State['multiplayer'] = yield select((s: State) => s.multiplayer)
+  const isOnlineMultiplayer = multiplayerState.enabled && multiplayerState.roomInfo != null
 
-  if (isGuest) {
-    // Guest 模式：运行 tick 发射器、玩家输入发送、地图加载
-    // 游戏状态（坦克、子弹）由 Host 广播同步
-    console.log('Guest mode: 运行基础游戏逻辑，坦克和子弹状态由 Host 同步')
+  if (isOnlineMultiplayer) {
+    // 服务器权威模式：客户端只负责输入和渲染
+    // 游戏逻辑（AI、子弹、碰撞）由服务器运行
+    const role = multiplayerState.roomInfo!.role
+    console.log(`[Multiplayer] Server-Authoritative mode, role: ${role}`)
 
-    // Guest 需要玩家输入发送器
-    const players = [playerSaga('player-2', PLAYER_CONFIGS.player2)]
+    // 根据角色确定本地玩家
+    const localPlayerName = role === 'host' ? 'player-1' : 'player-2'
+    // 联机模式统一使用 WASD + 空格
+    const localPlayerConfig = {
+      ...MULTIPLAYER_CONFIG,
+      color: role === 'host' ? 'yellow' as const : 'green' as const,
+      spawnPos: role === 'host' ? PLAYER_CONFIGS.player1.spawnPos : PLAYER_CONFIGS.player2.spawnPos,
+    }
+
+    // 只启动本地玩家的控制器（用于发送输入）
+    const players = [playerSaga(localPlayerName as PlayerName, localPlayerConfig)]
 
     yield race({
       tick: tickEmitter({ bindESC: true }),
@@ -99,11 +111,10 @@ export default function* gameSaga(action: actions.StartGame | actions.ResetGame)
       leave: take(A.LeaveGameScene),
     })
   } else {
-    // Host 模式或单机模式：正常运行所有游戏逻辑
+    // 单机模式或本地双人模式：正常运行所有游戏逻辑
     const players = [playerSaga('player-1', PLAYER_CONFIGS.player1)]
-    if (yield select(selectors.isInMultiPlayersMode)) {
-      // 在联机 Host 模式下，player-2 由 Host 根据 Guest 输入控制
-      // 但仍需要启动 playerSaga 来激活坦克
+    if (isMultiplayerMode) {
+      // 本地双人模式
       players.push(playerSaga('player-2', PLAYER_CONFIGS.player2))
     }
 

@@ -105,6 +105,22 @@ export const PLAYER_CONFIGS: { [key: string]: PlayerConfig } = {
   },
 }
 
+// 联机模式专用配置：统一使用 WASD + 空格
+export const MULTIPLAYER_CONFIG: PlayerConfig = {
+  color: 'yellow', // 会根据角色动态覆盖
+  control: {
+    up: 'KeyW',
+    left: 'KeyA',
+    down: 'KeyS',
+    right: 'KeyD',
+    fire: 'Space',
+  },
+  spawnPos: {
+    x: 4 * BLOCK_SIZE, // 会根据角色动态覆盖
+    y: 12 * BLOCK_SIZE,
+  },
+}
+
 export const TANK_LEVELS: TankLevel[] = ['basic', 'fast', 'power', 'armor']
 
 export const POWER_UP_NAMES: PowerUpName[] = [
