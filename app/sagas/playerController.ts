@@ -5,22 +5,8 @@ import { Input, PlayerConfig, TankRecord } from '../types'
 import { A } from '../utils/actions'
 import directionController from './directionController'
 import fireController from './fireController'
-import { socketService } from '../utils/SocketService'
 import { State } from '../reducers'
-import * as selectors from '../utils/selectors'
-
-// 输入历史记录（用于客户端预测和状态校正）
-interface InputHistoryEntry {
-  sequenceId: number;
-  direction: Direction | null;
-  fire: boolean;
-  timestamp: number;
-  tankState: {
-    x: number;
-    y: number;
-    direction: Direction;
-  };
-}
+import { updateLocalInput } from './multiplayerGameSaga'
 
 // 一个 playerController 实例对应一个人类玩家(用户)的控制器.
 // 参数playerName用来指定人类玩家的玩家名称, config为该玩家的操作配置.
@@ -29,22 +15,19 @@ export default function* playerController(tankId: TankId, config: PlayerConfig) 
   let firePressing = false // 用来记录当前玩家是否按下了fire键
   let firePressed = false // 用来记录上一个tick内 玩家是否按下过fire键
   const pressed: Direction[] = [] // 用来记录上一个tick内, 玩家按下过的方向键
-  let lastSentInput: string | null = null // 上次发送的输入状态（用于节流）
-  let inputSequenceId = 0 // 输入序列号
-  const inputHistory: InputHistoryEntry[] = [] // 输入历史记录（最多保存100个）
-  const MAX_HISTORY_SIZE = 100
+
+  // 检查是否为联机模式（服务器权威模式）
+  const multiplayerState: State['multiplayer'] = yield select((s: State) => s.multiplayer)
+  const isOnlineMultiplayer = multiplayerState.enabled && multiplayerState.roomInfo != null
 
   try {
     document.addEventListener('keydown', onKeyDown)
     document.addEventListener('keyup', onKeyUp)
 
     if (isOnlineMultiplayer) {
-      // 服务器权威模式：只发送输入到服务器
-      // 坦克状态由服务器广播同步
-      yield all([
-        resetFirePressedEveryTick(),
-        sendInputToServer(),
-      ])
+      // 服务器权威模式：更新本地输入状态供 multiplayerGameSaga 使用
+      // multiplayerGameSaga 负责发送输入到服务器和客户端预测
+      yield all([resetFirePressedEveryTick(), updateLocalInputState()])
     } else {
       // 单机模式或本地双人模式：运行本地控制器
       yield all([
@@ -116,68 +99,19 @@ export default function* playerController(tankId: TankId, config: PlayerConfig) 
     }
   }
 
-  // 发送输入到服务器（联机模式）
-  function* sendInputToServer() {
+  // 更新本地输入状态（联机模式）
+  // 将键盘输入同步到 multiplayerGameSaga 的 localInputState
+  function* updateLocalInputState() {
     while (true) {
       yield take(A.Tick)
 
-      // 检查是否启用联机模式
-      const state: State = yield select()
-      if (!state.multiplayer.enabled || !state.multiplayer.roomInfo) {
-        continue
-      }
-      
-      // 获取当前坦克状态
-      const tank: TankRecord = yield select((s: State) => s.tanks.get(tankId))
-      if (!tank) {
-        continue
-      }
-      
-      // 构建当前输入状态
+      // 获取当前输入状态
       const currentDirection = pressed.length > 0 ? last(pressed) : null
       const isMoving = pressed.length > 0
       const isFiring = firePressing || firePressed
-      const inputState = JSON.stringify({ direction: currentDirection, moving: isMoving, firing: isFiring })
 
-      // 节流：只有输入状态改变时才发送
-      if (inputState !== lastSentInput) {
-        lastSentInput = inputState
-        inputSequenceId++
-        
-        // 记录输入历史（用于客户端预测和状态校正）
-        inputHistory.push({
-          sequenceId: inputSequenceId,
-          direction: currentDirection,
-          fire: currentFire,
-          timestamp: Date.now(),
-          tankState: {
-            x: tank.x,
-            y: tank.y,
-            direction: tank.direction,
-          },
-        })
-        
-        // 限制历史记录大小
-        if (inputHistory.length > MAX_HISTORY_SIZE) {
-          inputHistory.shift()
-        }
-        
-        // 发送输入到服务器（带序列号）
-        socketService.sendPlayerInput({
-          type: 'state',
-          direction: currentDirection || undefined,
-          moving: isMoving,
-          firing: isFiring,
-          timestamp: Date.now(),
-          sequenceId: inputSequenceId,
-        })
-        
-        console.log(`[Client Prediction] Sent input #${inputSequenceId}:`, {
-          direction: currentDirection,
-          fire: currentFire,
-          position: { x: tank.x, y: tank.y },
-        })
-      }
+      // 更新 multiplayerGameSaga 的本地输入状态
+      updateLocalInput(currentDirection || null, isMoving, isFiring)
     }
   }
   // endregion
